@@ -1,0 +1,240 @@
+
+ll.registerPlugin('miao-language', '喵言喵语插件', [2, 1, 0]);
+
+logger.info('=== 喵言喵语插件开始加载 ===');
+
+// 配置文件路径
+const configFilePath = './plugins/miao-language/config.json';
+
+// 默认配置
+const defaultConfig = {
+    enabled: true,
+    settings: {
+        addEndingProbability: 1.0,        // 添加喵语结尾的概率 (0.0-1.0)
+        addKaomojiProbability: 0.5,        // 添加颜文字的概率 (0.0-1.0)
+        enableEnding: true,                 // 是否启用喵语结尾
+        enableKaomoji: true                  // 是否启用颜文字
+    },
+    kaomoji: [
+        "(ﾉ´ヮ`)ﾉ*: ･ﾟ",
+        "ヾ(≧▽≦*)o",
+        "o(>ω<)o",
+        "(☆▽☆)",
+        "(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧",
+        "(*≧ω≦)",
+        "(ﾉ*･ω･)ﾉ",
+        "(｡♥‿♥｡)",
+        "(つ✧ω✧)つ",
+        "(,,◕ ⋏ ◕,,)",
+        "(⁄ ⁄>⁄ ▽⁄<⁄ ⁄)",
+        "(,,>﹏<,,)",
+        "(⁄ ⁄•⁄ω⁄•⁄ ⁄)",
+        "ヽ(>∀<☆)ノ",
+        "(ﾉ≧∀≦)ﾉ",
+        "(๑˃ᴗ˂)ﻭ",
+        "(๑╹◡╹๑)",
+        "(๑>ᴗ<๑)",
+        "(◍•ᴗ•◍)❤",
+        "(´ ∀ ` *)",
+        "(⁎˃ᆺ˂)",
+        "(✧ω✧)",
+        "(●´ω｀●)",
+        "(＾• ω •＾)",
+        "(´• ω •`)",
+        "ヽ(≧ω≦)ﾉ",
+        "(=^･ω･^=)",
+        "(^・ω・^)"
+    ],
+    endings: [
+        "喵嘤~",
+        "喵喵",
+        "喵！",
+        "喵~",
+        "喵……",
+        "喵。",
+        "喵呜！"
+    ]
+};
+
+// 当前配置
+let config = {};
+
+// 玩家数据存储
+const playerData = new Map();
+
+// 读取配置文件
+function loadConfig() {
+    try {
+        // 检查配置文件是否存在
+        if (File.exists(configFilePath)) {
+            // 读取配置文件
+            const fileContent = File.readFrom(configFilePath);
+            if (fileContent) {
+                const loadedConfig = JSON.parse(fileContent);
+                // 合并配置（保留用户自定义，补充缺失的默认值）
+                config = mergeConfig(defaultConfig, loadedConfig);
+                logger.info('✅ 配置文件加载成功');
+            } else {
+                throw new Error('配置文件为空');
+            }
+        } else {
+            // 配置文件不存在，创建默认配置
+            logger.warn('⚠️ 配置文件不存在，正在创建默认配置...');
+            config = JSON.parse(JSON.stringify(defaultConfig)); // 深拷贝
+            saveConfig();
+            logger.info('✅ 默认配置文件已创建');
+        }
+    } catch (error) {
+        logger.error('❌ 配置文件加载失败: ' + error);
+        logger.warn('⚠️ 使用默认配置启动');
+        config = JSON.parse(JSON.stringify(defaultConfig)); // 深拷贝
+    }
+}
+
+// 合并配置（递归合并对象）
+function mergeConfig(defaultObj, userObj) {
+    const result = {};
+    
+    // 合并所有默认配置的键
+    for (const key in defaultObj) {
+        if (defaultObj.hasOwnProperty(key)) {
+            // 如果用户配置中有这个键
+            if (userObj && userObj.hasOwnProperty(key)) {
+                // 如果值是对象，递归合并
+                if (typeof defaultObj[key] === 'object' && defaultObj[key] !== null && 
+                    typeof userObj[key] === 'object' && userObj[key] !== null) {
+                    result[key] = mergeConfig(defaultObj[key], userObj[key]);
+                } else {
+                    // 否则直接使用用户配置的值
+                    result[key] = userObj[key];
+                }
+            } else {
+                // 用户配置中没有这个键，使用默认值
+                result[key] = defaultObj[key];
+            }
+        }
+    }
+    
+    // 添加用户配置中但默认配置没有的键（保留用户自定义内容）
+    if (userObj) {
+        for (const key in userObj) {
+            if (userObj.hasOwnProperty(key) && !result.hasOwnProperty(key)) {
+                result[key] = userObj[key];
+            }
+        }
+    }
+    
+    return result;
+}
+
+// 保存配置文件
+function saveConfig() {
+    try {
+        // 确保插件目录存在
+        const pluginDir = './plugins/miao-language';
+        if (!File.exists(pluginDir)) {
+            File.mkdir(pluginDir);
+        }
+        
+        // 写入配置文件
+        File.writeTo(configFilePath, JSON.stringify(config, null, 4));
+        logger.info('✅ 配置文件保存成功');
+        return true;
+    } catch (error) {
+        logger.error('❌ 配置文件保存失败: ' + error);
+        return false;
+    }
+}
+
+// 初始化插件
+function initializePlugin() {
+    // 加载配置
+    loadConfig();
+    
+    if (!config.enabled) {
+        logger.warn('⚠️ 喵言喵语插件已禁用');
+        return;
+    }
+    
+    logger.info('🐱 喵言喵语插件已启动！');
+    logger.info(`📊 当前配置：喵语结尾概率 ${config.settings.addEndingProbability * 100}%，颜文字概率 ${config.settings.addKaomojiProbability * 100}%`);
+}
+
+// 玩家加入事件
+mc.listen('onJoin', (player) => {
+    if (!config.enabled) return;
+    
+    const playerInfo = {
+        name: player.name,
+        xuid: player.xuid
+    };
+    
+    playerData.set(player.xuid, playerInfo);
+});
+
+// 玩家离开事件
+mc.listen('onLeft', (player) => {
+    const playerInfo = playerData.get(player.xuid);
+    if (playerInfo) {
+        playerData.delete(player.xuid);
+    }
+});
+
+// 监听聊天事件
+mc.listen('onChat', (player, msg) => {
+    if (!config.enabled) return true;
+    
+    try {
+        const playerInfo = playerData.get(player.xuid);
+        if (!playerInfo) return true;
+        
+        // 转换为喵言喵语
+        const miaoMessage = convertToMiaoLanguage(msg);
+        
+        // 直接广播转换后的消息
+        const finalMessage = "<" + playerInfo.name + "> " + miaoMessage;
+        mc.broadcast(finalMessage);
+        
+        // 取消原始消息
+        return false;
+        
+    } catch (error) {
+        logger.error('❌ 喵言喵语处理出错: ' + error);
+        return true;
+    }
+});
+
+// 转换为喵言喵语
+function convertToMiaoLanguage(text) {
+    if (!text || text.length === 0) return "喵...";
+    
+    let result = text;
+    
+    // 根据配置添加喵语结尾
+    if (config.settings.enableEnding && Math.random() < config.settings.addEndingProbability) {
+        const ending = getRandomItem(config.endings);
+        result += ending;
+    }
+    
+    // 根据配置添加颜文字
+    if (config.settings.enableKaomoji && Math.random() < config.settings.addKaomojiProbability) {
+        const kaomoji = getRandomItem(config.kaomoji);
+        result = result + " " + kaomoji;
+    }
+    
+    return result;
+}
+
+// 从数组中随机获取一项
+function getRandomItem(array) {
+    if (!array || array.length === 0) return '';
+    const index = Math.floor(Math.random() * array.length);
+    return array[index];
+}
+
+// 服务器启动时初始化
+mc.listen('onServerStarted', () => {
+    initializePlugin();
+});
+
+logger.info('=== 喵言喵语插件加载完成！ ===');
